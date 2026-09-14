@@ -333,11 +333,11 @@
             </main>
         </div>
     </div>
+
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
     <!-- Scripts -->
     <script>
         const firebaseConfig = {
@@ -474,6 +474,8 @@
                 const docSnap = await docRef.get();
                 if (docSnap.exists) {
                     appData = docSnap.data();
+                    if(!appData.sales) appData.sales = [];
+                    if(!appData.customers) appData.customers = [];
                     if(!appData.employees) appData.employees = [];
                 } else {
                     appData = { sales: [], customers: [], employees: [] };
@@ -543,6 +545,9 @@
                 return;
             }
 
+            if(!appData.sales) appData.sales = [];
+            if(!appData.customers) appData.customers = [];
+
             appData.sales.unshift({ fuelType, liters, price, customerName, carNumber, saleNote, total, date: dateStr });
 
             let customer = appData.customers.find(c => c.name === customerName);
@@ -577,6 +582,7 @@
                     customer.debt = Math.max(0, customer.debt - amount);
                     
                     const dateStr = new Date().toISOString().split('T')[0];
+                    if(!appData.sales) appData.sales = [];
                     appData.sales.unshift({
                         fuelType: 'دانەوەی قەرز (پارەدان)',
                         liters: 0,
@@ -736,9 +742,13 @@
         }
 
         function updateUI() {
-            let totalSales = appData.sales.reduce((acc, s) => acc + s.total, 0);
-            let totalLiters = appData.sales.reduce((acc, s) => acc + s.liters, 0);
-            let totalDebts = appData.customers.reduce((acc, c) => acc + c.debt, 0);
+            if(!appData.sales) appData.sales = [];
+            if(!appData.customers) appData.customers = [];
+            if(!appData.employees) appData.employees = [];
+
+            let totalSales = appData.sales.reduce((acc, s) => acc + (s.total || 0), 0);
+            let totalLiters = appData.sales.reduce((acc, s) => acc + (s.liters || 0), 0);
+            let totalDebts = appData.customers.reduce((acc, c) => acc + (c.debt || 0), 0);
 
             document.getElementById('stat-sales').innerText = totalSales.toLocaleString() + ' د.ع';
             document.getElementById('stat-liters').innerText = totalLiters.toLocaleString() + ' لیتر';
@@ -779,19 +789,17 @@
                 </tr>
             `).join('') || '<tr><td colspan="3" class="p-4 text-center text-gray-400">هیچ قەرزێک نییە</td></tr>';
 
-            if(!appData.employees) appData.employees = [];
-            
             let empSelect = document.getElementById('empSelect');
             empSelect.innerHTML = appData.employees.map(e => `<option value="${e.name}">${e.name} (مووچە: ${e.salary.toLocaleString()})</option>`).join('');
 
             let empBody = document.getElementById('employees-table-body');
             empBody.innerHTML = appData.employees.map(e => {
-                let netSalary = e.salary - e.advance;
+                let netSalary = (e.salary || 0) - (e.advance || 0);
                 return `
                     <tr>
                         <td class="p-4 font-medium">${e.name}</td>
-                        <td class="p-4">${e.salary.toLocaleString()} د.ع</td>
-                        <td class="p-4 text-rose-600 font-bold">${e.advance.toLocaleString()} د.ع</td>
+                        <td class="p-4">${(e.salary || 0).toLocaleString()} د.ع</td>
+                        <td class="p-4 text-rose-600 font-bold">${(e.advance || 0).toLocaleString()} د.ع</td>
                         <td class="p-4">${e.advanceDate || '-'}</td>
                         <td class="p-4 text-emerald-600 font-bold">${netSalary.toLocaleString()} د.ع</td>
                         <td class="p-4 flex gap-2">
