@@ -55,7 +55,7 @@
             </div>
         </div>
     </div>
-       <div class="flex h-screen overflow-hidden">
+    <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
         <aside class="w-64 bg-slate-900 text-white flex flex-col hidden md:flex">
             <div class="p-5 text-xl font-bold border-b border-slate-800 flex items-center gap-3">
@@ -275,7 +275,7 @@
 
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 space-y-4">
                         <h3 class="text-lg font-bold border-b pb-3">تۆمارکردنی قەرز / پێشینەی کارمەند (پێش سەرەمانگ)</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label class="block text-sm font-medium mb-1">هەڵبژاردنی کارمەند</label>
                                 <select id="empSelect" class="w-full border rounded-lg p-2.5 bg-gray-50 focus:ring-2 focus:ring-amber-500"></select>
@@ -283,6 +283,10 @@
                             <div>
                                 <label class="block text-sm font-medium mb-1">بڕی پارەی براو (د.ع)</label>
                                 <input type="number" id="empAdvanceAmount" placeholder="نموونە: ١٠٠٠٠٠ یان ٢٠٠٠٠٠" class="w-full border rounded-lg p-2.5 bg-gray-50 focus:ring-2 focus:ring-amber-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">بەرواری قەرز</label>
+                                <input type="date" id="empAdvanceDate" class="w-full border rounded-lg p-2.5 bg-gray-50 focus:ring-2 focus:ring-amber-500">
                             </div>
                         </div>
                         <button onclick="recordEmployeeAdvance()" class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold px-6 py-2.5 rounded-lg transition text-sm">تۆمارکردنی قەرز بۆ کارمەند</button>
@@ -296,6 +300,7 @@
                                     <th class="p-4">ناوی کارمەند</th>
                                     <th class="p-4">مووچەی مانگانە</th>
                                     <th class="p-4">قەرزی وەگیراو (پێش سەرەمانگ)</th>
+                                    <th class="p-4">بەرواری قەرز</th>
                                     <th class="p-4">پارەی ماوە بۆ سەرەمانگ</th>
                                     <th class="p-4">کردارەکان</th>
                                 </tr>
@@ -328,7 +333,6 @@
             </main>
         </div>
     </div>
-
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -358,7 +362,7 @@
                 modal.classList.add('hidden');
                 document.getElementById('user-email-display').innerText = user.email;
                 document.getElementById('header-user-badge').innerText = 'بەکارهێنەر: ' + user.email;
-                loadDataFromFirebase(user.uid);
+                loadDataFromFirebase(user.email);
             } else {
                 modal.classList.remove('hidden');
                 appData = { sales: [], customers: [], employees: [] };
@@ -464,9 +468,9 @@
             auth.signOut();
         }
 
-        async function loadDataFromFirebase(uid) {
+        async function loadDataFromFirebase(email) {
             try {
-                const docRef = db.collection("mam_rashan_users_data").doc(uid);
+                const docRef = db.collection("mam_rashan_users_data").doc(email);
                 const docSnap = await docRef.get();
                 if (docSnap.exists) {
                     appData = docSnap.data();
@@ -484,7 +488,7 @@
             const user = auth.currentUser;
             if (!user) return;
 
-            db.collection("mam_rashan_users_data").doc(user.uid).set(appData)
+            db.collection("mam_rashan_users_data").doc(user.email).set(appData)
                 .then(() => {
                     updateUI();
                 })
@@ -606,7 +610,7 @@
                 return;
             }
 
-            appData.employees.push({ name, salary, advance: 0 });
+            appData.employees.push({ name, salary, advance: 0, advanceDate: '' });
             document.getElementById('newEmpName').value = '';
             document.getElementById('newEmpSalary').value = '';
             saveData();
@@ -624,6 +628,7 @@
         function recordEmployeeAdvance() {
             const name = document.getElementById('empSelect').value;
             const advance = parseFloat(document.getElementById('empAdvanceAmount').value) || 0;
+            const advanceDate = document.getElementById('empAdvanceDate').value;
 
             if (!name || advance <= 0) {
                 alert('تکایە کارمەند هەڵبژێرە و بڕی پارەی دروست بنووسە!');
@@ -633,7 +638,11 @@
             let emp = appData.employees.find(e => e.name === name);
             if (emp) {
                 emp.advance += advance;
+                if (advanceDate) {
+                    emp.advanceDate = advanceDate;
+                }
                 document.getElementById('empAdvanceAmount').value = '';
+                document.getElementById('empAdvanceDate').value = '';
                 saveData();
                 alert('قەرزەکە بۆ کارمەند تۆمارکرا!');
             }
@@ -644,6 +653,7 @@
             if (emp) {
                 if (confirm(`ئایا بڕیاری سەرەمانگت دا بۆ کارمەند ${name}؟ قەرزەکەی لێ دەبڕدرێت و بۆ مانگی داهاتوو سفر دەبێتەوە.`)) {
                     emp.advance = 0;
+                    emp.advanceDate = '';
                     saveData();
                     alert('حسابەکەی بۆ سەرەمانگ پاککراوەوە و بۆ مانگی داهاتوو ئامادەیە!');
                 }
@@ -782,6 +792,7 @@
                         <td class="p-4 font-medium">${e.name}</td>
                         <td class="p-4">${e.salary.toLocaleString()} د.ع</td>
                         <td class="p-4 text-rose-600 font-bold">${e.advance.toLocaleString()} د.ع</td>
+                        <td class="p-4">${e.advanceDate || '-'}</td>
                         <td class="p-4 text-emerald-600 font-bold">${netSalary.toLocaleString()} د.ع</td>
                         <td class="p-4 flex gap-2">
                             <button onclick="settleMonthlySalary('${e.name}')" class="bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-600">
@@ -793,7 +804,7 @@
                         </td>
                     </tr>
                 `;
-            }).join('') || '<tr><td colspan="5" class="p-4 text-center text-gray-400">هیچ کارمەندێک تۆمار نەکراوە</td></tr>';
+            }).join('') || '<tr><td colspan="6" class="p-4 text-center text-gray-400">هیچ کارمەندێک تۆمار نەکراوە</td></tr>';
         }
     </script>
 </body>
