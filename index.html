@@ -333,7 +333,6 @@
             </main>
         </div>
     </div>
-
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -358,11 +357,21 @@
 
         auth.onAuthStateChanged((user) => {
             const modal = document.getElementById('login-modal');
+            const errorDiv = document.getElementById('login-error');
+
             if (user) {
-                modal.classList.add('hidden');
-                document.getElementById('user-email-display').innerText = user.email;
-                document.getElementById('header-user-badge').innerText = 'بەکارهێنەر: ' + user.email;
-                loadDataFromFirebase(user.email);
+                if (!user.emailVerified) {
+                    modal.classList.remove('hidden');
+                    errorDiv.innerText = "تکایە ئاگاداربن: ئیمەیڵەکەتان ڤێرفای (Verify) نەکراوە! تکایە سەردانی ئیمەیڵەکەتان بکەن و لینکی پشتڕاستکردنەوە دابگرن پاشان لۆگین ببنەوە.";
+                    errorDiv.classList.remove('hidden');
+                    auth.signOut();
+                } else {
+                    modal.classList.add('hidden');
+                    errorDiv.classList.add('hidden');
+                    document.getElementById('user-email-display').innerText = user.email;
+                    document.getElementById('header-user-badge').innerText = 'بەکارهێنەر: ' + user.email;
+                    loadDataFromFirebase(user.email);
+                }
             } else {
                 modal.classList.remove('hidden');
                 appData = { sales: [], customers: [], employees: [] };
@@ -409,6 +418,13 @@
             }
 
             auth.signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    if (!userCredential.user.emailVerified) {
+                        errorDiv.innerText = "تکایە سەرەتا ئیمەیڵەکەت ڤێرفای بکە پاشان بڕۆوە ناو سیستەم.";
+                        errorDiv.classList.remove('hidden');
+                        auth.signOut();
+                    }
+                })
                 .catch((error) => {
                     errorDiv.innerText = "هەڵە لە چوونەژوورەوە: ئیمەیڵ یان وشەی تێپەڕ هەڵەیە.";
                     errorDiv.classList.remove('hidden');
@@ -430,9 +446,13 @@
             }
 
             auth.createUserWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    return userCredential.user.sendEmailVerification();
+                })
                 .then(() => {
-                    successDiv.innerText = "ئەکاونت بە سەرکەوتوویی دروستکرا و چوویتە ژوورەوە!";
+                    successDiv.innerText = "ئەکاونت دروستکرا! تکایە سەردانی ئیمەیڵەکەت بکە و لینکی ڤێرفای دابگرە، پاشان لۆگین بە.";
                     successDiv.classList.remove('hidden');
+                    auth.signOut();
                 })
                 .catch((error) => {
                     errorDiv.innerText = "هەڵە لە دروستکردنی ئەکاونت: " + error.message;
@@ -741,6 +761,65 @@
             });
         }
 
+        // وەسڵی تایبەت بە کارمەند
+        function downloadEmployeePDF(empName) {
+            let emp = appData.employees.find(e => e.name === empName);
+            if (!emp) return;
+
+            let netSalary = (emp.salary || 0) - (emp.advance || 0);
+            let currentDate = new Date().toISOString().split('T')[0];
+
+            let container = document.getElementById('pdf-export-container');
+            container.classList.remove('hidden');
+            container.innerHTML = `
+                <div style="font-family: 'Vazirmatn', sans-serif; direction: rtl; padding: 25px; background: #fff; color: #333; width: 600px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 10px;">
+                    <div style="text-align: center; border-bottom: 2px solid #f59e0b; padding-bottom: 12px; margin-bottom: 20px;">
+                        <h2 style="margin: 0; color: #1e293b; font-size: 22px;">بنزینخانەی مام رەشان</h2>
+                        <p style="margin: 5px 0 0 0; color: #64748b; font-size: 13px;">وەسڵی شایستە و مووچەی کارمەند (سەرەمانگ)</p>
+                        <p style="margin: 5px 0 0 0; color: #64748b; font-size: 11px;">ڕێکەوت: ${currentDate}</p>
+                    </div>
+
+                    <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px;">
+                        <p style="margin: 6px 0;"><strong>ناوی کارمەند:</strong> ${emp.name}</p>
+                        <p style="margin: 6px 0;"><strong>مووچەی مانگانە:</strong> ${(emp.salary || 0).toLocaleString()} د.ع</p>
+                        <p style="margin: 6px 0;"><strong>قەرزی وەگیراو (پێشینە):</strong> <span style="color: #e11d48; font-weight: bold;">${(emp.advance || 0).toLocaleString()} د.ع</span></p>
+                        <p style="margin: 6px 0;"><strong>بەرواری قەرز:</strong> ${emp.advanceDate || '-'}</p>
+                        <hr style="border: 0; border-top: 1px dashed #cbd5e1; margin: 10px 0;">
+                        <p style="margin: 6px 0; font-size: 15px;"><strong>پارەی ماوە (شایستەی وەرگرتن):</strong> <span style="color: #047857; font-weight: bold;">${netSalary.toLocaleString()} د.ع</span></p>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; margin-top: 40px; font-size: 12px;">
+                        <div style="text-align: center;">
+                            <p>واژۆی بەڕێوەبەر</p>
+                            <br><br>
+                            <p>.........................</p>
+                        </div>
+                        <div style="text-align: center;">
+                            <p>واژۆی کارمەند</p>
+                            <br><br>
+                            <p>.........................</p>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 30px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+                        سوپاس بۆ خزمەتکردنتان - بنزینخانەی مام رەشان
+                    </div>
+                </div>
+            `;
+
+            const options = {
+                margin:       10,
+                filename:     `employee-${empName}-salary.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().from(container).set(options).save().then(() => {
+                container.classList.add('hidden');
+            });
+        }
+
         function updateUI() {
             if(!appData.sales) appData.sales = [];
             if(!appData.customers) appData.customers = [];
@@ -802,7 +881,10 @@
                         <td class="p-4 text-rose-600 font-bold">${(e.advance || 0).toLocaleString()} د.ع</td>
                         <td class="p-4">${e.advanceDate || '-'}</td>
                         <td class="p-4 text-emerald-600 font-bold">${netSalary.toLocaleString()} د.ع</td>
-                        <td class="p-4 flex gap-2">
+                        <td class="p-4 flex flex-wrap gap-2">
+                            <button onclick="downloadEmployeePDF('${e.name}')" class="bg-amber-500 text-slate-900 px-3 py-1.5 rounded text-xs font-bold hover:bg-amber-600 flex items-center gap-1">
+                                <i class="fa-solid fa-file-pdf"></i> وەسڵی PDFی کارمەند
+                            </button>
                             <button onclick="settleMonthlySalary('${e.name}')" class="bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-600">
                                 لێبڕین و سفرکردنەوە (سەرەمانگ)
                             </button>
@@ -817,3 +899,4 @@
     </script>
 </body>
 </html>
+
